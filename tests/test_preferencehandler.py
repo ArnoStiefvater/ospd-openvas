@@ -20,7 +20,7 @@
 import logging
 
 from unittest import TestCase
-from unittest.mock import patch, Mock, MagicMock
+from unittest.mock import call, patch, Mock, MagicMock
 
 from ospd.vts import Vts
 
@@ -30,7 +30,12 @@ from tests.helper import assert_called_once
 import ospd_openvas.db
 
 from ospd_openvas.openvas import Openvas
-from ospd_openvas.preferencehandler import PreferenceHandler
+from ospd_openvas.preferencehandler import (
+    AliveTest,
+    BOREAS,
+    BOREAS_ALIVE_TEST,
+    PreferenceHandler,
+)
 
 
 class PreferenceHandlerTestCase(TestCase):
@@ -463,23 +468,68 @@ class PreferenceHandlerTestCase(TestCase):
         )
 
     @patch('ospd_openvas.db.KbDB')
-    def test_set_alive_only(self, mock_kb):
+    def test_set_boreas_alive_test_with_settings(self, mock_kb):
+        # Invalid value for alive test.
         w = DummyDaemon()
-
-        t_opt = {'alive_test': 16}
+        t_opt = {'alive_test': "error"}
         w.scan_collection.get_target_options = MagicMock(return_value=t_opt)
-
-        ov_setting = {'test_alive_hosts_only': 'yes'}
-
+        ov_setting = {'some_setting': 1}
         with patch.object(Openvas, 'get_settings', return_value=ov_setting):
             p = PreferenceHandler('1234-1234', mock_kb, w.scan_collection, None)
             p._openvas_scan_id = '456-789'
             p.kbdb.add_scan_preferences = MagicMock()
-            p.prepare_alive_test_option_for_openvas()
+            p.prepare_boreas_alive_test()
 
-            p.kbdb.add_scan_preferences.assert_called_with(
-                p._openvas_scan_id, ['ALIVE_TEST|||16'],
-            )
+            p.kbdb.add_scan_preferences.assert_not_called()
+
+        # Valid value for alive test.
+        w = DummyDaemon()
+        t_opt = {'alive_test': 16}
+        w.scan_collection.get_target_options = MagicMock(return_value=t_opt)
+        ov_setting = {'some_setting': 1}
+        with patch.object(Openvas, 'get_settings', return_value=ov_setting):
+            p = PreferenceHandler('1234-1234', mock_kb, w.scan_collection, None)
+            p._openvas_scan_id = '456-789'
+            p.kbdb.add_scan_preferences = MagicMock()
+            p.prepare_boreas_alive_test()
+
+            calls = [call(p._openvas_scan_id, ['ALIVE_TEST|||16'])]
+            p.kbdb.add_scan_preferences.assert_has_calls(calls)
+
+        # ICMP was chosen as alive test.
+        w = DummyDaemon()
+        t_opt = {'alive_test': AliveTest.ALIVE_TEST_ICMP}
+        w.scan_collection.get_target_options = MagicMock(return_value=t_opt)
+        ov_setting = {'some_setting': 1}
+        with patch.object(Openvas, 'get_settings', return_value=ov_setting):
+            p = PreferenceHandler('1234-1234', mock_kb, w.scan_collection, None)
+            p._openvas_scan_id = '456-789'
+            p.kbdb.add_scan_preferences = MagicMock()
+            p.prepare_boreas_alive_test()
+
+            call1_pref = [
+                "{0}|||{1}".format(BOREAS_ALIVE_TEST, AliveTest.ALIVE_TEST_ICMP)
+            ]
+            call2_pref = ["{0}|||{1}".format(BOREAS, 'yes')]
+            calls = [
+                call(p._openvas_scan_id, call1_pref),
+                call(p._openvas_scan_id, call2_pref),
+            ]
+            p.kbdb.add_scan_preferences.assert_has_calls(calls)
+
+    @patch('ospd_openvas.db.KbDB')
+    def test_set_boreas_alive_test_without_settings(self, mock_kb):
+        w = DummyDaemon()
+        t_opt = {'alive_test': 16}
+        w.scan_collection.get_target_options = MagicMock(return_value=t_opt)
+        ov_setting = {}
+        with patch.object(Openvas, 'get_settings', return_value=ov_setting):
+            p = PreferenceHandler('1234-1234', mock_kb, w.scan_collection, None)
+            p._openvas_scan_id = '456-789'
+            p.kbdb.add_scan_preferences = MagicMock()
+            p.prepare_boreas_alive_test()
+
+            p.kbdb.add_scan_preferences.assert_not_called()
 
     @patch('ospd_openvas.db.KbDB')
     def test_set_alive_no_setting(self, mock_kb):

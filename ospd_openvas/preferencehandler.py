@@ -47,6 +47,9 @@ OID_ESXI_AUTH = "1.3.6.1.4.1.25623.1.0.105058"
 OID_SNMP_AUTH = "1.3.6.1.4.1.25623.1.0.105076"
 OID_PING_HOST = "1.3.6.1.4.1.25623.1.0.100315"
 
+BOREAS_ALIVE_TEST = "ALIVE_TEST"
+BOREAS = "test_alive_hosts_only"
+
 
 class AliveTest(IntEnum):
     """ Alive Tests. """
@@ -379,37 +382,47 @@ class PreferenceHandler:
         return target_opt_prefs_list
 
     def prepare_alive_test_option_for_openvas(self):
-        """ Set alive test option. Overwrite the scan config settings.
-        Check if test_alive_hosts_only feature of openvas is active.
-        If active, put ALIVE_TEST enum in preferences. """
+        """ Set alive test option. Overwrite the scan config settings."""
         settings = Openvas.get_settings()
         if settings:
-            test_alive_hosts_only = settings.get('test_alive_hosts_only')
-            if test_alive_hosts_only:
-                if self.target_options.get('alive_test'):
-                    try:
-                        alive_test = int(self.target_options.get('alive_test'))
-                    except ValueError:
-                        logger.debug(
-                            'Alive test settings not applied. '
-                            'Invalid alive test value %s',
-                            self.target_options.get('alive_test'),
-                        )
-                    # Put ALIVE_TEST enum in db, this is then taken
-                    # by openvas to determine the method to use
-                    # for the alive test.
-                    if alive_test >= 1 and alive_test <= 31:
-                        item = 'ALIVE_TEST|||%s' % str(alive_test)
-                        self.kbdb.add_scan_preferences(
-                            self._openvas_scan_id, [item]
-                        )
-            elif self.target_options.get('alive_test'):
-                alive_test_opt = self.build_alive_test_opt_as_prefs(
-                    self.target_options
-                )
-                self.kbdb.add_scan_preferences(
-                    self._openvas_scan_id, alive_test_opt
-                )
+            alive_test_opt = self.build_alive_test_opt_as_prefs(
+                self.target_options
+            )
+            self.kbdb.add_scan_preferences(
+                self._openvas_scan_id, alive_test_opt
+            )
+
+    def prepare_boreas_alive_test(self):
+        """Always set alive test as scan preference if provided.
+           Overwrite scan config setting `test-alive-hosts-only` to `yes` if
+           ICMP was chosen as alive test. This way Boreas will be used
+           as default for ICMP although it was not chosen explicetly."""
+        settings = Openvas.get_settings()
+        alive_test = None
+        if settings:
+            alive_test_str = self.target_options.get('alive_test')
+            if alive_test_str:
+                try:
+                    alive_test = int(alive_test_str)
+                except ValueError:
+                    logger.debug(
+                        'Alive test preference for Boreas not set. '
+                        'Invalid alive test value %s.',
+                        alive_test_str,
+                    )
+
+        if alive_test is not None and 1 <= alive_test <= 31:
+            pref = "{pref_key}|||{pref_value}".format(
+                pref_key=BOREAS_ALIVE_TEST, pref_value=alive_test
+            )
+            self.kbdb.add_scan_preferences(self._openvas_scan_id, [pref])
+
+        # Overwrite scan config setting for activating Boreas.
+        if alive_test is not None and alive_test == AliveTest.ALIVE_TEST_ICMP:
+            pref = "{pref_key}|||{pref_value}".format(
+                pref_key=BOREAS, pref_value='yes'
+            )
+            self.kbdb.add_scan_preferences(self._openvas_scan_id, [pref])
 
     def prepare_reverse_lookup_opt_for_openvas(self):
         """ Set reverse lookup options in the kb"""
