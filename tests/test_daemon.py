@@ -46,10 +46,6 @@ OSPD_PARAMS_OUT = {
         'name': 'cgi_path',
         'default': '/cgi-bin:/scripts',
         'mandatory': 1,
-        'description': 'Look for default CGIs in /cgi-bin and /scripts',
-    },
-    'checks_read_timeout': {
-        'type': 'integer',
         'name': 'checks_read_timeout',
         'default': 5,
         'mandatory': 1,
@@ -95,12 +91,21 @@ OSPD_PARAMS_OUT = {
         'timesout.',
     },
     'optimize_test': {
-        'type': 'integer',
+        'type': 'boolean',
         'name': 'optimize_test',
-        'default': 5,
+        'default': 1,
         'mandatory': 0,
-        'description': 'By default, openvas does not trust the remote '
-        'host banners.',
+        'description': (
+            'By default, optimize_test is enabled which means openvas does '
+            + 'trust the remote host banners and is only launching plugins '
+            + 'against the services they have been designed to check. '
+            + 'For example it will check a web server claiming to be IIS only '
+            + 'for IIS related flaws but will skip plugins testing for Apache '
+            + 'flaws, and so on. This default behavior is used to optimize '
+            + 'the scanning performance and to avoid false positives. '
+            + 'If you are not sure that the banners of the remote host '
+            + 'have been tampered with, you can disable this option.'
+        ),
     },
     'plugins_timeout': {
         'type': 'integer',
@@ -114,10 +119,6 @@ OSPD_PARAMS_OUT = {
         'name': 'report_host_details',
         'default': 1,
         'mandatory': 1,
-        'description': '',
-    },
-    'safe_checks': {
-        'type': 'boolean',
         'name': 'safe_checks',
         'default': 1,
         'mandatory': 1,
@@ -158,10 +159,6 @@ OSPD_PARAMS_OUT = {
         'name': 'expand_vhosts',
         'default': 1,
         'mandatory': 0,
-        'description': 'Whether to expand the target hosts '
-        + 'list of vhosts with values gathered from sources '
-        + 'such as reverse-lookup queries and VT checks '
-        + 'for SSL/TLS certificates.',
     },
     'test_empty_vhost': {
         'type': 'boolean',
